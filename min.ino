@@ -17,13 +17,13 @@
   #include <HTTPClient.h>
   #include <WebServer.h>
   // #include <Esp32WifiManager.h>
-  #include "BluetoothSerial.h"
-  #include "esp_bt_main.h"
-  #include "esp_bt_device.h"
+//  #include "BluetoothSerial.h"
+//  #include "esp_bt_main.h"
+//  #include "esp_bt_device.h"
   
   #include <Wire.h>
-  #include "SSD1306Wire.h"
-  SSD1306Wire  display(0x3c, 21, 22);//4 | 15 SDA SCL
+  #include "SSD1306.h"
+  SSD1306  display(0x3c, 4, 15);//4 | 15 SDA SCL
 // SH1106Wire display(0x3c, D3, D5);
 #endif
 #include "OLEDDisplayUi.h"
@@ -36,8 +36,8 @@ OLEDDisplayUi ui     ( &display );
 //#define D6 (12)
 #define BAUD_RATE 57600
 
-const char *ssid = "FAI-Students";
-const char *password = "Fai@@112018";
+const char *ssid = "FreeWifi";
+const char *password = "87654231";
 //TODO: list wifi
 
 const char *host = "lman-test.firebaseapp.com";
@@ -46,7 +46,8 @@ const int httpsPort = 443;  //HTTPS= 443 and HTTP = 80
 const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2, 0x44, 0xe0, 0x44, 0x22, 0xd0, 0x86, 0x9b, 0xf2, 0x56, 0xa7, 0x7c, 0x95};
 
 //I/O
-#define TURBIDITY_SENSOR A0
+#define TURBIDITY_SENSOR 12
+#define PH_SENSOR 13
 #if (ESP8266)
   #define BUTTON D3 //D3 D6! D7! ---- gạt sang bên trái để bật, sang phải để reset
 #elif (ESP32)
@@ -59,11 +60,11 @@ const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2,
 #endif
 
 //bluetooth config
-#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
-  bool isBluetoothEnabled = false;
-#else
-  bool isBluetoothEnabled = true;
-#endif
+//#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+//  bool isBluetoothEnabled = false;
+//#else
+//  bool isBluetoothEnabled = true;
+//#endif
 
 //constants
 #define MEASURING_SCREEN 0
@@ -96,13 +97,17 @@ BlynkTimer wifiScanner;
 BlynkTimer bluetoothHandler;
 BlynkTimer dataSender;
 
-#if (ESP32)
-BluetoothSerial SerialBT;
-#endif
+//#if (ESP32)
+//BluetoothSerial SerialBT;
+//#endif
 //----------------------------------
 
 void setup() {
-  // put your setup code here, to run once:
+  pinMode(16, OUTPUT);
+  digitalWrite(16, LOW);    // set GPIO16 low to reset OLED
+  delay(50); 
+  digitalWrite(16, HIGH); // while OLED is running, must set GPIO16 in high
+
   Serial.begin(BAUD_RATE);
   Serial.println("Starting...");
 
@@ -110,6 +115,7 @@ void setup() {
   pinMode(LED_NOTIFY, OUTPUT);
   digitalWrite(LED_NOTIFY, LOW);
   pinMode(BUTTON, INPUT);
+
   Serial1.begin(57600);
   Serial1.printf("AT+MODE=1\r\n");
 
@@ -119,23 +125,23 @@ void setup() {
   dataSender.setInterval(10000, sendDataToExternal);
 
   //****Bluetooth****
-  #if (ESP32)
-    SerialBT.begin("Water Testing Instant");//-----------------------------------------------------------------------here
-    if (!isBluetoothEnabled
-        || !btStart()
-        || esp_bluedroid_init() != ESP_OK
-        || esp_bluedroid_enable() != ESP_OK
-    ) //Bluetooth available?
-    {
-      //Your chip doesn't support bluetooth
-      bluetooth_status = DISCONNECTED;
-    } else {
+//  #if (ESP32)
+//    SerialBT.begin("Water Testing Instant");//-----------------------------------------------------------------------here
+//    if (!isBluetoothEnabled
+//        || !btStart()
+//        || esp_bluedroid_init() != ESP_OK
+//        || esp_bluedroid_enable() != ESP_OK
+//    ) //Bluetooth available?
+//    {
+//      //Your chip doesn't support bluetooth
+//      bluetooth_status = DISCONNECTED;
+//    } else {
 //      printDeviceAddress();
-      bluetoothHandler.setInterval(200L, bluetoothHandle);
-      bluetooth_status = SCANNING;
-    }
-  #endif
-  //***
+//      bluetoothHandler.setInterval(200L, bluetoothHandle);
+//      bluetooth_status = SCANNING;
+//    }
+//  #endif
+//  //***
   
   ui.init();
   display.flipScreenVertically();
@@ -170,8 +176,10 @@ void handleButtonClick () {
   if (buttonStatus == LOW) {
     if (frameController == MEASURING_SCREEN) {
       frameController = RESULT_SCREEN;
+      measuringCount = resultCount = 0;
     } else {
       frameController = MEASURING_SCREEN;
+      measuringCount = resultCount = 0;
     }
   }
 }
@@ -227,7 +235,8 @@ bool sendDataToCloudViaWifi() {
     } else {
       Serial.println("Connected to web");
     }
-    String data = "{\"ph\":" + String(last_pH) + ",\"tds\":" + String(last_TDS) + ",\"turbidity\":" + String(last_Turbidity) + "}";
+    // String data = "{\"ph\":" + String(last_pH) + ",\"tds\":" + String(last_TDS) + ",\"turbidity\":" + String(last_Turbidity) + "}";
+    String data = String(last_pH) + "-" + String(last_TDS) + "-" + String(last_Turbidity);
     
     httpsClient.print("POST " + subdirectory + " HTTP/1.1\r\n" +
                 "Host: " + host + "\r\n" +
@@ -249,16 +258,16 @@ bool sendDataToCloudViaWifi() {
   }
 }
 //------------Bluetooth Manager------------------
-#if (ESP32)
-  void bluetoothHandle () {
-    if (Serial.available()) {
-          SerialBT.write(Serial.read());
-    }
-    if (SerialBT.available()) {
-      bluetooth_status = CONNECTED;
-      Serial.println(SerialBT.read());
-    }
-  }
+//#if (ESP32)
+//  void bluetoothHandle () {
+//    if (Serial.available()) {
+//          SerialBT.write(Serial.read());
+//    }
+//    if (SerialBT.available()) {
+//      bluetooth_status = CONNECTED;
+//      Serial.println(SerialBT.read());
+//    }
+//  }
 //  void printDeviceAddress() {
 //    const uint8_t* point = esp_bt_dev_get_address();
 //    for (int i = 0; i < 6; i++) {
@@ -270,27 +279,25 @@ bool sendDataToCloudViaWifi() {
 //      }
 //    }
 //  }
-  bool sendDataViaBluetooth() {
-    String data = "{\"ph\":" + String(last_pH) + ",\"tds\":" + String(last_TDS) + ",\"turbidity\":" + String(last_Turbidity) + "}";
-    return false;
-  }
-#endif
+//  bool sendDataViaBluetooth() {
+//    String data = "{\"ph\":" + String(last_pH) + ",\"tds\":" + String(last_TDS) + ",\"turbidity\":" + String(last_Turbidity) + "}";
+//    return false;
+//  }
+//#endif
 
 //--------------------View--------------------
 void measuringScreen() {
   UIOverlay();
-  if (measuringCount % 5 > 2) {
-    readSensor(&last_pH, &last_TDS, &last_Turbidity);
-  }
+  readSensor();
   displayData();
-  // if (measuringCount % 2 == 0) {digitalWrite(LED_NOTIFY, HIGH);} else {digitalWrite(LED_NOTIFY, LOW);}//flash BUILT-IN LED
-  if (measuringCount > 100) {
+  measuringCount++;
+  if (measuringCount > 4000) {
+    measuringCount = resultCount = 0;
     frameController = RESULT_SCREEN;
   }
-  measuringCount++;
 }
 void resultScreen() {
-  if (resultCount % 10 > 3) {
+  if (resultCount % 700 > 400) {
     UIOverlay();
     //pH
     display.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -305,15 +312,15 @@ void resultScreen() {
     display.setFont(ArialMT_Plain_24);
     display.drawString(125 , 30, String(last_Turbidity));
   }
-  if (resultCount > 100 ){
-    resultCount = 0;
-    frameController = RESULT_SCREEN;
+  resultCount++;
+  if (resultCount > 300) {
+    measuringCount = resultCount = 0;
+    // frameController = MEASURING_SCREEN;
   }
   if (!isDataSent) {
     dataSender.run();
     isDataSent = true;
   }
-  resultCount++;
 };
 
 //---
@@ -346,31 +353,40 @@ void displayData() {
 
 
 //---------------Model------------------
-void readSensor(int* pH_data, int* TDS_data, int* Turbidity_data) {
-  //replace REAL sensor with this later on
-  *pH_data = millis()/1000;
+int sampleCount = 0;
+int total_pH = 0;
+int total_TDS = 0;
+int total_Turbidity = 0;
+void readSensor() {
   //TDS
   Serial1.printf("AT+VALUE=?\r\n");
   String tds_measured = Serial.readStringUntil('\n');
+  //nếu nhúng vào nước
   if (tds_measured.toInt() != 0) {
-    *TDS_data = tds_measured.toInt();
-  } else {
-    *TDS_data = last_TDS;
+    total_TDS += tds_measured.toInt();
+    //Turbidity
+    total_Turbidity += analogRead(TURBIDITY_SENSOR);
+    //pH
+    total_pH += analogRead(PH_SENSOR);
+    
+    sampleCount++;
   }
-  //Turbidity
-  *Turbidity_data = analogRead(TURBIDITY_SENSOR);
-  if (*Turbidity_data == 0) {
-    *Turbidity_data = last_Turbidity;
+
+  if (sampleCount == 40) {
+    last_pH = total_pH / 40;
+    last_TDS = total_TDS / 40;
+    last_Turbidity = total_Turbidity / 40;
+    sampleCount = 0;
   }
 }
 
 void sendDataToExternal() {
   if(!sendDataToCloudViaWifi()) {
-    #if (ESP32)
-      if(sendDataViaBluetooth) {
-        Serial.println("Data sent via bluetooth");
-      } else
-    #endif
+//    #if (ESP32)
+//      if(sendDataViaBluetooth) {
+//        Serial.println("Data sent via bluetooth");
+//      } else
+//    #endif
       Serial.println("Data can't be sent");
   }
 }
