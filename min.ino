@@ -36,17 +36,19 @@ OLEDDisplayUi ui     ( &display );
 //#define D6 (12)
 #define BAUD_RATE 57600
 
+const char *penID = "pen1";
+
 const char *ssid = "FreeWifi";
 const char *password = "87654231";
 //TODO: list wifi
-
-const char *host = "lman-test.firebaseapp.com";
-const String subdirectory = "/save";
+//https://watertestinginstant.firebaseapp.com/new-noti
+const char *host = "watertestinginstant.firebaseapp.com";
+const String subdirectory = "/new-noti";
 const int httpsPort = 443;  //HTTPS= 443 and HTTP = 80
 const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2, 0x44, 0xe0, 0x44, 0x22, 0xd0, 0x86, 0x9b, 0xf2, 0x56, 0xa7, 0x7c, 0x95};
 
 //I/O
-#define TURBIDITY_SENSOR 12
+#define TURBIDITY_SENSOR 0
 #define PH_SENSOR 13
 // #if (ESP8266)
 //   #define BUTTON D3 //D3 D6! D7! ---- gạt sang bên trái để bật, sang phải để reset
@@ -151,8 +153,9 @@ void setup() {
 }
 
 void loop() {
-  // wifiScanner.run();
-  // // buttonHandler.run();
+  wifiScanner.run();
+  Serial.println(analogRead(TURBIDITY_SENSOR));
+  // buttonHandler.run();
   frameUpdate();
   // delay(FRAME_RATE);
 }
@@ -235,7 +238,7 @@ bool sendDataToCloudViaWifi() {
       Serial.println("Connected to web");
     }
     // String data = "{\"ph\":" + String(last_pH) + ",\"tds\":" + String(last_TDS) + ",\"turbidity\":" + String(last_Turbidity) + "}";
-    String data = String(last_pH) + "-" + String(last_TDS) + "-" + String(last_Turbidity);
+    String data = String(last_pH) + "-" + String(last_TDS) + "-" + String(last_Turbidity) + "-" + String(penID);
     
     httpsClient.print("POST " + subdirectory + " HTTP/1.1\r\n" +
                 "Host: " + host + "\r\n" +
@@ -328,20 +331,20 @@ void displayData() {
   //pH
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(0 , 20, String(last_pH));
+  display.drawString(0 , 25, String(last_pH));
   //TDS
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(60 , 20, String(last_TDS));
+  display.drawString(60 , 25, String(last_TDS));
   //Turbidity
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(125 , 20, String(last_Turbidity));
+  display.drawString(125 , 25, String(last_Turbidity));
 }
 
 
 //---------------Model------------------
-// int sampleCount = 0;
+int sampleCount = 0;
 int total_pH = 0;
 int total_TDS = 0;
 int total_Turbidity = 0;
@@ -351,30 +354,38 @@ void readSensor() {
   String tds_measured = TdsSensor.readStringUntil('\n');
   //nếu nhúng vào nước
   if (tds_measured.toInt() != 0) {
-    last_TDS = tds_measured.toInt();
+    // last_TDS = tds_measured.toInt();
+    // //Turbidity
+    // last_Turbidity = 1000 - (analogRead(TURBIDITY_SENSOR) * 1000 / 4095);
+    // // Serial.println(last_Turbidity);
+    // //pH
+    // last_pH = analogRead(PH_SENSOR)
+    //               * 5 / 4096 //analog -> millivolt
+    //               * 3.5      //millivolt -> true value
+    //                 ;
+    total_TDS += tds_measured.toInt();
     //Turbidity
-    last_Turbidity = 1000 - (analogRead(TURBIDITY_SENSOR) * 1000 / 4095);
+    total_Turbidity += 1000 - (analogRead(TURBIDITY_SENSOR) * 1000 / 4095);
     // Serial.println(last_Turbidity);
     //pH
-    last_pH = analogRead(PH_SENSOR)
+    total_pH += analogRead(PH_SENSOR)
                   * 5 / 4096 //analog -> millivolt
                   * 3.5      //millivolt -> true value
                     ;
-    // sampleCount++;
+    sampleCount++;
 
   }
 
-  // if (sampleCount == 30) {
-  //   last_pH = ((float) total_pH)
-  //                 * 5 / 4096 //analog -> millivolt
-  //                 * 3.5      //millivolt -> true value
-  //                 / 30 ;     //average out
-  //   last_TDS = total_TDS
-  //                  / 30;
-  //   last_Turbidity = 1000 - (((float) total_Turbidity)
-  //                 * 1000 / 4096 / 30);
-  //   sampleCount = 0;
-  // }
+  if (sampleCount == 30) {
+    //average out
+    last_pH = total_pH / 30 ;
+    last_TDS = total_TDS / 30;
+    last_Turbidity = total_Turbidity / 30;
+    Serial.println(last_Turbidity);
+
+    total_pH = total_TDS = total_Turbidity = 0;
+    sampleCount = 0;
+  }
 }
 
 void sendDataToExternal() {
