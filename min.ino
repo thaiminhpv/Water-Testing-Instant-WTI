@@ -1,6 +1,6 @@
 //#include <TimeLib.h>
 #include <WiFiClientSecure.h> 
-//#include <SoftwareSerial.h>
+#include <SoftwareSerial.h>
 
 #if (ESP8266)
   #include <ESP8266WiFi.h>
@@ -48,16 +48,16 @@ const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2,
 //I/O
 #define TURBIDITY_SENSOR 12
 #define PH_SENSOR 13
-#if (ESP8266)
-  #define BUTTON D3 //D3 D6! D7! ---- gạt sang bên trái để bật, sang phải để reset
-#elif (ESP32)
-  #define BUTTON 18
-#endif
-#ifdef LED_BUILTIN
-  #define LED_NOTIFY LED_BUILTIN
-#else
-  #define LED_NOTIFY 5
-#endif
+// #if (ESP8266)
+//   #define BUTTON D3 //D3 D6! D7! ---- gạt sang bên trái để bật, sang phải để reset
+// #elif (ESP32)
+//   #define BUTTON 18
+// #endif
+// #ifdef LED_BUILTIN
+//   #define LED_NOTIFY LED_BUILTIN
+// #else
+//   #define LED_NOTIFY 5
+// #endif
 
 //bluetooth config
 //#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
@@ -67,8 +67,8 @@ const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2,
 //#endif
 
 //constants
-#define MEASURING_SCREEN 0
-#define RESULT_SCREEN 1
+// #define MEASURING_SCREEN 0
+// #define RESULT_SCREEN 1
 
 #define SCANNING 0
 #define DISCONNECTED 1
@@ -78,8 +78,9 @@ const uint8_t fingerprint[20] = {0x46, 0xf2, 0xe8, 0x99, 0x89, 0x6d, 0x93, 0xc2,
 
 //variables
 int wifi_status = DISCONNECTED;
-int bluetooth_status = DISCONNECTED;
-int frameController = MEASURING_SCREEN;
+// int bluetooth_status = DISCONNECTED;
+// int frameController = MEASURING_SCREEN;
+bool isMeasuring = true;
 
 //frame tracking variables
 int measuringCount = 0;
@@ -92,10 +93,12 @@ int last_TDS = 0;
 int last_Turbidity = 0;
 
 //Singleton Objects
-BlynkTimer buttonHandler;
+// BlynkTimer buttonHandler;
 BlynkTimer wifiScanner;
-BlynkTimer bluetoothHandler;
+// BlynkTimer bluetoothHandler;
 BlynkTimer dataSender;
+
+SoftwareSerial TdsSensor(14, 23);
 
 //#if (ESP32)
 //BluetoothSerial SerialBT;
@@ -112,15 +115,15 @@ void setup() {
   Serial.println("Starting...");
 
   //sensors
-  pinMode(LED_NOTIFY, OUTPUT);
-  digitalWrite(LED_NOTIFY, LOW);
-  pinMode(BUTTON, INPUT);
+  // pinMode(LED_NOTIFY, OUTPUT);
+  // digitalWrite(LED_NOTIFY, LOW);
+  // pinMode(BUTTON, INPUT);
 
-  Serial1.begin(57600);
-  Serial1.printf("AT+MODE=1\r\n");
+  TdsSensor.begin(9600);
+  TdsSensor.printf("AT+MODE=1\r\n");
 
 
-  buttonHandler.setInterval(200, handleButtonClick);
+  // buttonHandler.setInterval(200, handleButtonClick);
   wifiScanner.setInterval(1000, scanWifi);
   dataSender.setInterval(10000, sendDataToExternal);
 
@@ -144,12 +147,12 @@ void setup() {
 //  //***
   
   ui.init();
-  display.flipScreenVertically();
+  // display.flipScreenVertically();
 }
 
 void loop() {
-  wifiScanner.run();
-  buttonHandler.run();
+  // wifiScanner.run();
+  // // buttonHandler.run();
   frameUpdate();
   // delay(FRAME_RATE);
 }
@@ -157,32 +160,28 @@ void loop() {
 void frameUpdate () {
   display.clear();
   
-  switch (frameController) {
-    case MEASURING_SCREEN:
-      measuringScreen();
-      break;
-    case RESULT_SCREEN:
-      resultScreen();
-      break;
+  if (isMeasuring) {
+    measuringScreen();
+  } else {
+    resultScreen();
   }
-  
   display.display();
 }
 //
 
-int buttonStatus = HIGH; //invert
-void handleButtonClick () {
-  buttonStatus = digitalRead(BUTTON);
-  if (buttonStatus == LOW) {
-    if (frameController == MEASURING_SCREEN) {
-      frameController = RESULT_SCREEN;
-      measuringCount = resultCount = 0;
-    } else {
-      frameController = MEASURING_SCREEN;
-      measuringCount = resultCount = 0;
-    }
-  }
-}
+// int buttonStatus = HIGH; //invert
+// void handleButtonClick () {
+//   buttonStatus = digitalRead(BUTTON);
+//   if (buttonStatus == LOW) {
+//     if (frameController == MEASURING_SCREEN) {
+//       frameController = RESULT_SCREEN;
+//       measuringCount = resultCount = 0;
+//     } else {
+//       frameController = MEASURING_SCREEN;
+//       measuringCount = resultCount = 0;
+//     }
+//   }
+// }
 
 
 //--------------Wifi Manager-----------------
@@ -293,27 +292,16 @@ void measuringScreen() {
   measuringCount++;
   if (measuringCount > 4000) {
     measuringCount = resultCount = 0;
-    frameController = RESULT_SCREEN;
+    isMeasuring = false;
   }
 }
 void resultScreen() {
   if (resultCount % 700 > 400) {
     UIOverlay();
-    //pH
-    display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.setFont(ArialMT_Plain_24);
-    display.drawString(0 , 30, String(last_pH));
-    //TDS
-    display.setTextAlignment(TEXT_ALIGN_CENTER);
-    display.setFont(ArialMT_Plain_24);
-    display.drawString(60 , 30, String(last_TDS));
-    //Turbidity
-    display.setTextAlignment(TEXT_ALIGN_RIGHT);
-    display.setFont(ArialMT_Plain_24);
-    display.drawString(125 , 30, String(last_Turbidity));
+    displayData();
   }
   resultCount++;
-  if (resultCount > 300) {
+  if (resultCount > 3500) {
     measuringCount = resultCount = 0;
     // frameController = MEASURING_SCREEN;
   }
@@ -326,58 +314,67 @@ void resultScreen() {
 //---
 void UIOverlay() {
   //draw pH --- TDS --- Turbidity
-  display.setTextAlignment(TEXT_ALIGN_LEFT);//pH
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(5 , 5, "pH");
-  display.setTextAlignment(TEXT_ALIGN_CENTER); //TDS
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(60 , 5, "TDS");
-  display.setTextAlignment(TEXT_ALIGN_RIGHT); //Turbidity
-  display.setFont(ArialMT_Plain_10);
-  display.drawString(125 , 5, "Turbidity");
+  // display.setTextAlignment(TEXT_ALIGN_LEFT);//pH
+  // display.setFont(ArialMT_Plain_10);
+  // display.drawString(5 , 5, "pH");
+  // display.setTextAlignment(TEXT_ALIGN_CENTER); //TDS
+  // display.setFont(ArialMT_Plain_10);
+  // display.drawString(60 , 5, "TDS");
+  // display.setTextAlignment(TEXT_ALIGN_RIGHT); //Turbidity
+  // display.setFont(ArialMT_Plain_10);
+  // display.drawString(125 , 5, "Turbidity");
 }
 void displayData() {
   //pH
   display.setTextAlignment(TEXT_ALIGN_LEFT);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(0 , 30, String(last_pH));
+  display.drawString(0 , 20, String(last_pH));
   //TDS
   display.setTextAlignment(TEXT_ALIGN_CENTER);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(60 , 30, String(last_TDS));
+  display.drawString(60 , 20, String(last_TDS));
   //Turbidity
   display.setTextAlignment(TEXT_ALIGN_RIGHT);
   display.setFont(ArialMT_Plain_24);
-  display.drawString(125 , 30, String(last_Turbidity));
+  display.drawString(125 , 20, String(last_Turbidity));
 }
 
 
 //---------------Model------------------
-int sampleCount = 0;
+// int sampleCount = 0;
 int total_pH = 0;
 int total_TDS = 0;
 int total_Turbidity = 0;
 void readSensor() {
   //TDS
-  Serial1.printf("AT+VALUE=?\r\n");
-  String tds_measured = Serial.readStringUntil('\n');
+  TdsSensor.printf("AT+VALUE=?\r\n");
+  String tds_measured = TdsSensor.readStringUntil('\n');
   //nếu nhúng vào nước
   if (tds_measured.toInt() != 0) {
-    total_TDS += tds_measured.toInt();
+    last_TDS = tds_measured.toInt();
     //Turbidity
-    total_Turbidity += analogRead(TURBIDITY_SENSOR);
+    last_Turbidity = 1000 - (analogRead(TURBIDITY_SENSOR) * 1000 / 4095);
+    // Serial.println(last_Turbidity);
     //pH
-    total_pH += analogRead(PH_SENSOR);
-    
-    sampleCount++;
+    last_pH = analogRead(PH_SENSOR)
+                  * 5 / 4096 //analog -> millivolt
+                  * 3.5      //millivolt -> true value
+                    ;
+    // sampleCount++;
+
   }
 
-  if (sampleCount == 40) {
-    last_pH = total_pH / 40;
-    last_TDS = total_TDS / 40;
-    last_Turbidity = total_Turbidity / 40;
-    sampleCount = 0;
-  }
+  // if (sampleCount == 30) {
+  //   last_pH = ((float) total_pH)
+  //                 * 5 / 4096 //analog -> millivolt
+  //                 * 3.5      //millivolt -> true value
+  //                 / 30 ;     //average out
+  //   last_TDS = total_TDS
+  //                  / 30;
+  //   last_Turbidity = 1000 - (((float) total_Turbidity)
+  //                 * 1000 / 4096 / 30);
+  //   sampleCount = 0;
+  // }
 }
 
 void sendDataToExternal() {
