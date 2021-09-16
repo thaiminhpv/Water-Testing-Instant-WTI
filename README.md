@@ -6,7 +6,7 @@
 
 Water Testing Instant (WTI) is one project of the LMAN team in FPT Edu Hackathon 2019.
 
-This repository contains embedded code. View the [Mobile implementation](https://github.com/hoangtrungnguyen/WaterTestingInstant) and [WTI Backend](https://github.com/DAN3002) 
+This repository contains embedded code. View the [Mobile implementation](https://github.com/hoangtrungnguyen/WaterTestingInstant) and [Backend](https://github.com/DAN3002) 
 
 <p float="left" align="middle">
   <img src="images/Thumbnail.jpg" width="67%" />
