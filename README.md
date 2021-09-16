@@ -1,4 +1,8 @@
-# Water Testing Instant (WTI)
+<p align="center"><img width="30%" src="images/Icon-water-blue.svg" alt="Oh My Zsh"></p>
+
+<h1 align="center">Water Testing Instant (WTI)<h1>
+  
+## About
 
 Water Testing Instant (WTI) is one project of the LMAN team in FPT Edu Hackathon 2019.
 
