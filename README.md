@@ -13,7 +13,7 @@ Author: thaiminhpv - **Phạm Vũ Thái Minh**
 - ver 1: https://youtu.be/I5SfC1utAxE
 - ver 2: https://youtu.be/U8-fJH5Vw60
 
-![example](./ver2.jpg)
+![example](images/ver2.jpg)
 
 
 Email: 
