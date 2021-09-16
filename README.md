@@ -1,23 +1,15 @@
-# Code Arduino nhúng
+# Water Testing Instant (WTI)
 
-## Hỗ trợ ESP32 và ESP8266
+Water Testing Instant (WTI) is one project of the LMAN team in FPT Edu Hackathon 2019.
 
-### ***Sản phẩm đã được mang ra dự thi trong đêm chung kết Hackathon 2019***
+This repository contains embedded code. View the [Mobile implementation (Flutter)](https://github.com/hoangtrungnguyen/WaterTestingInstant) and [WTI Backend](https://github.com/DAN3002) 
 
-Author: thaiminhpv - **Phạm Vũ Thái Minh**
+![thumbnail](images/ver2.jpg)
 
-## Prototype UI - https://youtu.be/hAtyMoNhch8
+## [Prototype](https://youtu.be/hAtyMoNhch8)
 
-## Demo
+Support ESP32 and ESP8266
 
-- ver 1: https://youtu.be/I5SfC1utAxE
-- ver 2: https://youtu.be/U8-fJH5Vw60
+- [version 1](https://youtu.be/I5SfC1utAxE)
+- [version 2 (final):](https://youtu.be/U8-fJH5Vw60)
 
-![example](images/ver2.jpg)
-
-
-Email: 
-
-- thaiminhpv@gmail.com
-
-- minhpvtfx00930@funix.edu.vn
