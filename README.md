@@ -4,11 +4,12 @@ Water Testing Instant (WTI) is one project of the LMAN team in FPT Edu Hackathon
 
 This repository contains embedded code. View the [Mobile implementation (Flutter)](https://github.com/hoangtrungnguyen/WaterTestingInstant) and [WTI Backend](https://github.com/DAN3002) 
 
-![thumbnail](images/Thumbnail.jpg)
+<p float="left" align="middle">
+  <img src="images/Thumbnail.jpg" width="67%" />
+  <img src="images/UI.png" width="26%" /> 
+</p>
 
 ## [Prototype](https://youtu.be/hAtyMoNhch8)
-
-![UI](images/UI.png)
 
 Support ESP32 and ESP8266
 
